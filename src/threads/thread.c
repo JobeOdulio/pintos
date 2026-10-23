@@ -11,7 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include "lib/kernal/list.h"
+#include "lib/kernel/list.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -91,7 +91,7 @@ void
 thread_init (void) 
 {
   ASSERT (intr_get_level () == INTR_OFF);
-
+  
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
@@ -101,6 +101,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -240,7 +241,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem, prio_more, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -337,8 +338,17 @@ thread_foreach (thread_action_func *func, void *aux)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
-{
-  thread_current ()->priority = new_priority;
+{ 
+  struct thread *cur = thread_current ();
+  cur->og_prio = new_priority;
+  cur->priority = new_priority;
+  for (struct list_elem *e = list_begin (&cur->donations); e != list_end (&cur->donations); e = list_next (e))
+  {
+    struct thread *donor = list_entry (e, struct thread, donation_elem);
+    if (donor->priority > cur->priority)
+      cur->priority = donor->priority; 
+  }
+  thread_yield ();
 }
 
 /* Returns the current thread's priority. */
@@ -470,8 +480,19 @@ init_thread (struct thread *t, const char *name, int priority)
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
+  t->og_prio = priority;
+  t->waiting_lock = NULL;
+  list_init(&t->donations);
 }
-
+/*compare priorities*/
+static bool
+prio_more (const struct list_elem *a,
+const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *ta = list_entry (a, struct thread, elem);
+  struct thread *tb = list_entry (a, struct thread, elem);
+  return ta->priority > tb->priority;
+}
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
    returns a pointer to the frame's base. */
 static void *
