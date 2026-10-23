@@ -41,6 +41,8 @@
 
    - up or "V": increment the value (and wake up one waiting
      thread, if any). */
+static bool prio_more (const struct list_elem *a,
+const struct list_elem *b, void *aux);
 void
 sema_init (struct semaphore *sema, unsigned value) 
 {
@@ -124,7 +126,7 @@ sema_up (struct semaphore *sema)
   sema->value++;
   intr_set_level (old_level);
 }
-bool
+static bool 
 prio_more (const struct list_elem *a,
 const struct list_elem *b, void *aux UNUSED)
 {
