@@ -223,7 +223,7 @@ lock_acquire (struct lock *lock)
        holder = holder->waiting_lock->holder;
      }
      if(lock -> holder != NULL)
-       list_push_back (&lock->holder->donations, &cur->donation__elem);
+       list_push_back (&lock->holder->donations, &cur->donation_elem);
   }
    
   sema_down (&lock->semaphore);

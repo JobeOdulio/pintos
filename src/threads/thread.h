@@ -96,7 +96,7 @@ struct thread
     int og_prio;
     struct lock *waiting_lock;
     struct list donations;
-    struct list_elem donation__elem;
+    struct list_elem donation_elem;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
