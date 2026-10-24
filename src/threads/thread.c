@@ -12,9 +12,19 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "lib/kernel/list.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+typedef int fixed_t;
+#define FP_F (1<<14)
+#define INT_TO_FP(n)  ((n) * FP_F)
+#define FP_TO_INT_ZERO(x)  ((x) / FP_F)
+#define FP_TO_INT_NEAR(x)   ((x) >= 0 ? ((x) + FP_F / 2) / FP_F \
+                                      : ((x) - FP_F / 2) / FP_F)
+#define FP_ADD_INT(x, n)    ((x) + (n) * FP_F)
+#define FP_MUL(x, y)        ((fixed_t) (((int64_t) (x)) * (y) / FP_F))
+#define FP_DIV(x, y)        ((fixed_t) (((int64_t) (x)) * FP_F / (y)))
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -50,7 +60,7 @@ struct kernel_thread_frame
 static long long idle_ticks;    /* # of timer ticks spent idle. */
 static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
 static long long user_ticks;    /* # of timer ticks in user programs. */
-
+static fixed_t load_avg;
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
@@ -73,7 +83,9 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 static bool prio_more (const struct list_elem *a,
 const struct list_elem *b, void *aux);
-
+static void mlfqs_update_priority (struct thread *t);
+static void mlfqs_recent_cpu_cb (struct thread *t, void *aux);
+static void mlfqs_priority_cb (struct thread *t, void *aux)
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -101,6 +113,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  load_avg = 0;
   
 }
 
@@ -186,6 +199,14 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+
+  if (thread_mlfqs)
+    {
+      struct thread *parent = thread_current ();
+      t->nice = parent->nice;
+      t->recent_cpu = parent->recent_cpu;
+      mlfqs_update_priority (t);
+    }
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -359,6 +380,8 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 { 
+  if (thread_mlfqs)
+    return;
   struct thread *cur = thread_current ();
   struct list_elem *e;
   enum intr_level old_lvl = intr_disable ();
@@ -380,12 +403,66 @@ thread_get_priority (void)
 {
   return thread_current ()->priority;
 }
+/*mlfql stuff*/
+static void
+mlfqs_update_priority (struct thread *t)
+{
+  if (t == idle_thread)
+    return;
 
+  int p = PRI_MAX - FP_TO_INT_ZERO (t->recent_cpu / 4) - t->nice * 2;
+  if (p > PRI_MAX) p = PRI_MAX;
+  if (p < PRI_MIN) p = PRI_MIN;
+  t->priority = p;
+}
+static void
+mlfqs_priority_cb (struct thread *t, void *aux UNUSED)
+{
+  mlfqs_update_priority (t);
+}
+static void
+mlfqs_recent_cpu_cb (struct thread *t, void *aux UNUSED)
+{
+  if (t == idle_thread)
+    return;
+
+  fixed_t twice = load_avg * 2;
+  fixed_t coeff = FP_DIV (twice, FP_ADD_INT (twice, 1));
+  t->recent_cpu = FP_ADD_INT (FP_MUL (coeff, t->recent_cpu), t->nice);
+}
+void
+thread_mlfqs_tick (int64_t ticks)
+{
+  struct thread *cur = thread_current ();
+
+  if (cur != idle_thread)
+    cur->recent_cpu = FP_ADD_INT (cur->recent_cpu, 1);
+
+  if (ticks % TIMER_FREQ == 0)
+    {
+      int ready = list_size (&ready_list) + (cur != idle_thread ? 1 : 0);
+
+      load_avg = FP_MUL (INT_TO_FP (59) / 60, load_avg)
+                 + INT_TO_FP (1) / 60 * ready;
+
+      thread_foreach (mlfqs_recent_cpu_cb, NULL);
+    }
+
+  if (ticks % 4 == 0)
+    thread_foreach (mlfqs_priority_cb, NULL);
+}
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) 
 {
   /* Not yet implemented. */
+  enum intr_level old = intr_disable ();
+  struct thread *cur = thread_current ();
+
+  cur->nice = nice;
+  mlfqs_update_priority (cur);
+  intr_set_level (old);
+  thread_yield_if_not_highest ();
 }
 
 /* Returns the current thread's nice value. */
@@ -393,7 +470,7 @@ int
 thread_get_nice (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  return thread_current ()->nice;
 }
 
 /* Returns 100 times the system load average. */
@@ -401,7 +478,10 @@ int
 thread_get_load_avg (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  enum intr_level old = intr_disable ();
+  int v = FP_TO_INT_NEAR (load_avg * 100);
+  intr_set_level (old);
+  return v;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -409,7 +489,10 @@ int
 thread_get_recent_cpu (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  enum intr_level old = intr_disable ();
+  int v = FP_TO_INT_NEAR (thread_current ()->recent_cpu * 100);
+  intr_set_level (old);
+  return v;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.

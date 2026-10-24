@@ -97,6 +97,8 @@ struct thread
     struct lock *waiting_lock;
     struct list donations;
     struct list_elem donation_elem;
+    int nice;
+    int recent_cpu;
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -120,6 +122,7 @@ void thread_print_stats (void);
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 void thread_yield_if_not_highest (void);
+void thread_mlfqs_tick (int64_t ticks);
 void thread_block (void);
 void thread_unblock (struct thread *);
 

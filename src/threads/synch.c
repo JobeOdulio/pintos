@@ -218,7 +218,7 @@ lock_acquire (struct lock *lock)
   struct thread *cur = thread_current ();
   enum intr_level old_lvl;
   old_lvl = intr_disable ();
-  if (lock->holder != NULL)
+  if (lock->holder != NULL && !thread_mlfqs) 
   {
      cur->waiting_lock = lock;
      struct thread *holder = lock->holder;
@@ -275,6 +275,9 @@ lock_release (struct lock *lock)
   struct list_elem *e = list_begin (&cur->donations);
   enum intr_level old_lvl;
   old_lvl = intr_disable ();
+  if (!thread_mlfqs)
+  {
+    e = list_begin (&cur->donations);
   while (e != list_end (&cur->donations))
   {
     struct thread *donor = list_entry (e, struct thread, donation_elem);
@@ -289,6 +292,7 @@ lock_release (struct lock *lock)
     struct thread *donor = list_entry (e, struct thread, donation_elem);
     if (donor->priority > cur->priority)
       cur->priority = donor->priority;
+  }
   }
   lock->holder = NULL;
   intr_set_level (old_lvl);

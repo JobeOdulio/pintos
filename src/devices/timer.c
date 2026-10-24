@@ -196,6 +196,8 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   wake_threads ();
+  if (thread_mlfqs)
+    thread_mlfqs_tick (ticks);
   thread_tick ();
   thread_yield_if_not_highest ();
 }
