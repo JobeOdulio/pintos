@@ -212,7 +212,7 @@ thread_yield_if_not_highest(void)
 {
   if (!list_empty (&ready_list))
   {
-    struct thread *t = list_entry (list_front (&ready_list), struct thread, elem);
+    struct thread *t = list_entry (list_min (&ready_list, prio_more, NULL), struct thread, elem);
     if (t->priority > thread_current ()->priority)
     {
       if(intr_context ())
@@ -355,6 +355,7 @@ thread_set_priority (int new_priority)
 { 
   struct thread *cur = thread_current ();
   struct list_elem *e;
+  enum intr_level old_lvl = intr_disable ();
   cur->og_prio = new_priority;
   cur->priority = new_priority;
   for (e = list_begin (&cur->donations); e != list_end (&cur->donations); e = list_next (e))
@@ -363,7 +364,8 @@ thread_set_priority (int new_priority)
     if (donor->priority > cur->priority)
       cur->priority = donor->priority; 
   }
-  thread_yield ();
+  intr_set_level (old_lvl);
+  thread_yield_if_not_highest ();
 }
 
 /* Returns the current thread's priority. */
@@ -531,8 +533,9 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  struct list_elem *m = list_min (&ready_list, prio_more, NULL);
+  list_remove (m);
+  return list_entry (m, struct thread, elem);
 }
 
 /* Completes a thread switch by activating the new thread's page
