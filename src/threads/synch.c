@@ -136,16 +136,7 @@ const struct list_elem *b, void *aux UNUSED)
   struct thread *tb = list_entry (b, struct thread, elem);
   return ta->priority > tb->priority;
 }
-static bool 
-cond_sema_prio_more (const struct list_elem *a,
-const struct list_elem *b, void *aux UNUSED)
-{
-  struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
-  struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
-  struct thread *ta = list_entry (list_front (&sa->semaphore.waiters),struct thread, elem);
-  struct thread *tb = list_entry (list_front (&sb->semaphore.waiters), struct thread, elem);
-  return ta->priority > tb->priority;
-}
+
 static void sema_test_helper (void *sema_);
 
 /* Self-test for semaphores that makes control "ping-pong"
@@ -317,6 +308,17 @@ struct semaphore_elem
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
    code to receive the signal and act upon it. */
+static bool 
+cond_sema_prio_more (const struct list_elem *a,
+const struct list_elem *b, void *aux UNUSED)
+{
+  struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
+  struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
+  struct thread *ta = list_entry (list_front (&sa->semaphore.waiters),struct thread, elem);
+  struct thread *tb = list_entry (list_front (&sb->semaphore.waiters), struct thread, elem);
+  return ta->priority > tb->priority;
+}
+static void sema_test_helper (void *sema_);
 void
 cond_init (struct condition *cond)
 {
