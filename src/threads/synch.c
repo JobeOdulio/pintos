@@ -45,6 +45,7 @@ static bool prio_more (const struct list_elem *a,
 const struct list_elem *b, void *aux);
 static bool cond_sema_prio_more (const struct list_elem *a,
 const struct list_elem *b, void *aux);
+static int sema_elem_prio(const struct semaphore_elem *s);
 void
 sema_init (struct semaphore *sema, unsigned value) 
 {
@@ -72,7 +73,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_insert_ordered (&sema->waiters, &thread_current ()->elem, prio_more, NULL);
+      list_push_back (&sema->waiters, &thread_current ()->elem);
       thread_block ();
     }
   sema->value--;
@@ -123,11 +124,12 @@ sema_up (struct semaphore *sema)
     list_remove (max_elem);
     thread_unblock (list_entry (max_elem,
                                 struct thread, elem));
-    thread_yield_if_not_highest ();
+    
 
   }
   sema->value++;
   intr_set_level (old_level);
+  thread_yield_if_not_highest ();
 }
 static bool 
 prio_more (const struct list_elem *a,
@@ -309,6 +311,14 @@ struct semaphore_elem
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
    code to receive the signal and act upon it. */
+static int
+sema_elem_prio (const struct semaphore_elem *s)
+{
+  if (list_empty (&s->semaphore.waiters))
+    return -1;                       
+  return list_entry (list_front (&s->semaphore.waiters),
+                     struct thread, elem)->priority;
+}
 static bool 
 cond_sema_prio_more (const struct list_elem *a,
 const struct list_elem *b, void *aux UNUSED)

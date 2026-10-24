@@ -210,16 +210,22 @@ thread_create (const char *name, int priority,
 void 
 thread_yield_if_not_highest(void)
 {
+  enum intr_level old_lvl = intr_disable ();
+  bool should_yield = false;
   if (!list_empty (&ready_list))
   {
     struct thread *t = list_entry (list_min (&ready_list, prio_more, NULL), struct thread, elem);
-    if (t->priority > thread_current ()->priority)
-    {
+    should_yield = t->priority > thread_current ()->priority;
+  }
+  intr_set_level (old_lvl);
+  if (should_yield)
+  {
+    
       if(intr_context ())
         intr_yield_on_return ();
       else
         thread_yield();
-    }
+    
   }
 }
 /* Puts the current thread to sleep.  It will not be scheduled
@@ -255,7 +261,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered (&ready_list, &t->elem, prio_more, NULL);
+  list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -326,7 +332,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_insert_ordered (&ready_list, &cur->elem, prio_more, NULL);
+    list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
