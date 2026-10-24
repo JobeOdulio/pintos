@@ -312,7 +312,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered (&ready_list, &cur->elem, prio_more, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -340,9 +340,10 @@ void
 thread_set_priority (int new_priority) 
 { 
   struct thread *cur = thread_current ();
+  struct list_elem *e;
   cur->og_prio = new_priority;
   cur->priority = new_priority;
-  for (struct list_elem *e = list_begin (&cur->donations); e != list_end (&cur->donations); e = list_next (e))
+  for (e = list_begin (&cur->donations); e != list_end (&cur->donations); e = list_next (e))
   {
     struct thread *donor = list_entry (e, struct thread, donation_elem);
     if (donor->priority > cur->priority)

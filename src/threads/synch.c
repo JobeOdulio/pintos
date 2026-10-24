@@ -43,6 +43,8 @@
      thread, if any). */
 static bool prio_more (const struct list_elem *a,
 const struct list_elem *b, void *aux);
+static bool cond_sema_prio_more (const struct list_elem *a,
+const struct list_elem *b, void *aux);
 void
 sema_init (struct semaphore *sema, unsigned value) 
 {
@@ -131,10 +133,19 @@ prio_more (const struct list_elem *a,
 const struct list_elem *b, void *aux UNUSED)
 {
   struct thread *ta = list_entry (a, struct thread, elem);
-  struct thread *tb = list_entry (a, struct thread, elem);
+  struct thread *tb = list_entry (b, struct thread, elem);
   return ta->priority > tb->priority;
 }
-
+static bool 
+cond_sema_prio_more (const struct list_elem *a,
+const struct list_elem *b, void *aux UNUSED)
+{
+  struct semaphore_elem *sa = list_entry (a, struct semaphore_elem, elem);
+  struct semaphore_elem *sb = list_entry (b, struct semaphore_elem, elem);
+  struct thread *ta = list_entry (list_front (&sa->semaphore.waiters),struct thread, elem);
+  struct thread *tb = list_entry (list_front (&sb->semaphore.waiters), struct thread, elem);
+  return ta->priority > tb->priority;
+}
 static void sema_test_helper (void *sema_);
 
 /* Self-test for semaphores that makes control "ping-pong"
@@ -224,8 +235,8 @@ lock_acquire (struct lock *lock)
        }
        holder = holder->waiting_lock->holder;
      }
-     if(lock -> holder != NULL)
-       list_push_back (&lock->holder->donations, &cur->donation_elem);
+     
+     list_push_back (&lock->holder->donations, &cur->donation_elem);
   }
    
   sema_down (&lock->semaphore);
@@ -367,8 +378,12 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters)) 
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
+  {
+    struct list_elem *max_elem = list_max (&cond->waiters, cond_sema_prio_more, NULL);
+    list_remove (max_elem);
+    sema_up (&list_entry (max_elem,
                           struct semaphore_elem, elem)->semaphore);
+  }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
