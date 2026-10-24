@@ -30,7 +30,7 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
-static bool wake_tick_less (const struct list_elem *a,
+static bool wake_ticks_less (const struct list_elem *a,
 const struct list_elem *b, void *aux);  /*wake_tick_less function*/
 static void wake_threads (void);
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
@@ -181,10 +181,10 @@ wake_threads (void)
 {
   while (!list_empty (&sleep_list))
   {
-    struct thread *t = list_entry (list_front ($sleep_list), struct thread, elem);
+    struct thread *t = list_entry (list_front (&sleep_list), struct thread, elem);
   
     if (t->wake_ticks > ticks)
-      break:
+      break;
     list_pop_front (&sleep_list);
     thread_unblock (t);
   }
