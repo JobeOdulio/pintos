@@ -28,29 +28,57 @@ FirstName LastName <email@domain.example>
 
 >> A1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
->> enumeration.  Identify the purpose of each in 25 words or less.
+>> enumeration.  Identify the purpose of each in 25 words or less. 
+enum indr_level old_lvl
+used multiple times forignoring interrupts
+int_64 wake_ticks
+ticks where threads need to wake
+static bool prio_more
+compares priorities
+int og_prio
+the original priority
+struct lock *waiting_lock
+the waiting lock
+struct list donations;
+list of donations for priority
+struct list_elem donation_elem
+donation element
+wake_tick_less
+compares wake ticks
+wake_threads
+calls unblock for the thread to wake
+cond_sema_prio_more
+compares for cond_signal to wake thread
+void thread_yield_if_not_highest
+important for calling yield for processes of lower prio
+typedef int fixed_t;
+fixed value for mlfqs 
+static void mlfqs_update_priority
+updates priority for mlfqs
+static void mlfqs_recent_cpu_cb
+static void mlfqs_priority_cb
 
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
-
+inserts thread into sleep_list and blocks threads to switch to another 
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
-
+by removing busy waiting by working with thread_block()
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
-
+by disabling interrupts
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
-
+the interrupt is held off because we disabled interrupts
 ---- RATIONALE ----
 
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
-
+i picked this design because i felt it was the most efficient and easy to implement
 			 PRIORITY SCHEDULING
 			 ===================
 
