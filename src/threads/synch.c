@@ -45,7 +45,7 @@ static bool prio_more (const struct list_elem *a,
 const struct list_elem *b, void *aux);
 static bool cond_sema_prio_more (const struct list_elem *a,
 const struct list_elem *b, void *aux);
-static int sema_elem_prio(const struct semaphore_elem *s);
+
 void
 sema_init (struct semaphore *sema, unsigned value) 
 {
@@ -216,6 +216,8 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
   struct thread *cur = thread_current ();
+  enum intr_level old_lvl;
+  old_lvl = intr_disable ();
   if (lock->holder != NULL)
   {
      cur->waiting_lock = lock;
@@ -236,6 +238,7 @@ lock_acquire (struct lock *lock)
   sema_down (&lock->semaphore);
   cur->waiting_lock = NULL;
   lock->holder = cur;
+  intr_set_level (old_lvl);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -270,7 +273,8 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   struct thread *cur = thread_current ();
   struct list_elem *e = list_begin (&cur->donations);
-
+  enum intr_level old_lvl;
+  old_lvl = intr_disable ();
   while (e != list_end (&cur->donations))
   {
     struct thread *donor = list_entry (e, struct thread, donation_elem);
@@ -287,6 +291,7 @@ lock_release (struct lock *lock)
       cur->priority = donor->priority;
   }
   lock->holder = NULL;
+  intr_set_level (old_lvl);
   sema_up (&lock->semaphore);
 }
 
@@ -311,6 +316,7 @@ struct semaphore_elem
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
    code to receive the signal and act upon it. */
+static int sema_elem_prio(const struct semaphore_elem *s);
 static int
 sema_elem_prio (const struct semaphore_elem *s)
 {
