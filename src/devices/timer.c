@@ -93,12 +93,13 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+  
   enum intr_level old_lvl;
   ASSERT (intr_get_level () == INTR_ON);
   if (ticks <= 0)
     return;
   old_lvl = intr_disable ();
+  int64_t start = timer_ticks ();
   thread_current ()->wake_ticks = start + ticks;
   list_insert_ordered (&sleep_list, &thread_current ()->elem, wake_ticks_less, NULL);
   thread_block();
