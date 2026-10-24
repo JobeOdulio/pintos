@@ -85,7 +85,7 @@ static bool prio_more (const struct list_elem *a,
 const struct list_elem *b, void *aux);
 static void mlfqs_update_priority (struct thread *t);
 static void mlfqs_recent_cpu_cb (struct thread *t, void *aux);
-static void mlfqs_priority_cb (struct thread *t, void *aux)
+static void mlfqs_priority_cb (struct thread *t, void *aux);
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
