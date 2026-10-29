@@ -30,33 +30,13 @@ FirstName LastName <email@domain.example>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less. 
 enum indr_level old_lvl
-used multiple times forignoring interrupts
+used multiple times for ignoring interrupts
 int_64 wake_ticks
 ticks where threads need to wake
-static bool prio_more
-compares priorities
-int og_prio
-the original priority
-struct lock *waiting_lock
-the waiting lock
-struct list donations;
-list of donations for priority
-struct list_elem donation_elem
-donation element
 wake_tick_less
 compares wake ticks
-wake_threads
-calls unblock for the thread to wake
-cond_sema_prio_more
-compares for cond_signal to wake thread
-void thread_yield_if_not_highest
-important for calling yield for processes of lower prio
-typedef int fixed_t;
-fixed value for mlfqs 
-static void mlfqs_update_priority
-updates priority for mlfqs
-static void mlfqs_recent_cpu_cb
-static void mlfqs_priority_cb
+
+
 
 ---- ALGORITHMS ----
 
@@ -87,6 +67,22 @@ i picked this design because i felt it was the most efficient and easy to implem
 >> B1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+static bool prio_more
+compares priorities
+int og_prio
+the original priority
+struct lock *waiting_lock
+the waiting lock
+struct list donations;
+list of donations for priority
+struct list_elem donation_elem
+donation element
+wake_threads
+calls unblock for the thread to wake
+cond_sema_prio_more
+compares for cond_signal to wake thread
+void thread_yield_if_not_highest
+important for calling yield for processes of lower prio
 
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
@@ -96,24 +92,25 @@ i picked this design because i felt it was the most efficient and easy to implem
 
 >> B3: How do you ensure that the highest priority thread waiting for
 >> a lock, semaphore, or condition variable wakes up first?
-
+by using a prio_more to compare the priorities
 >> B4: Describe the sequence of events when a call to lock_acquire()
 >> causes a priority donation.  How is nested donation handled?
-
+check the lock then check the waiting lock for priority then donates priority
 >> B5: Describe the sequence of events when lock_release() is called
 >> on a lock that a higher-priority thread is waiting for.
-
+remove donations then release the lock then wake the waiting thread
 ---- SYNCHRONIZATION ----
 
 >> B6: Describe a potential race in thread_set_priority() and explain
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
-
+it happens when a thread's prio is changing while the scheduler is accessing the ready list
+mine avoids it because it blocks interrupts when necessary.
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
-
+i chose this design because it made sense and is easier for me to understand
 			  ADVANCED SCHEDULER
 			  ==================
 
@@ -122,6 +119,12 @@ i picked this design because i felt it was the most efficient and easy to implem
 >> C1: Copy here the declaration of each new or changed `struct' or
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
+typedef int fixed_t;
+fixed value for mlfqs 
+static void mlfqs_update_priority
+updates priority for mlfqs
+static void mlfqs_recent_cpu_cb
+static void mlfqs_priority_cb
 
 ---- ALGORITHMS ----
 
@@ -133,38 +136,40 @@ i picked this design because i felt it was the most efficient and easy to implem
 timer  recent_cpu    priority   thread
 ticks   A   B   C   A   B   C   to run
 -----  --  --  --  --  --  --   ------
- 0
- 4
- 8
-12
-16
-20
-24
-28
-32
-36
+ 0     0   0   0   63  61  59   a
+ 4     4   0   0   62  61  59   a
+ 8     8   0   0   61  61  59   b
+12     8   4   0   61  60  59   a
+16     12  4   0   60  60  59   b
+20     12  8   0   60  59  59   a
+24     16  8   0   59  59  59   c
+28     16  8   4   59  59  58   b
+32     16  12  4   59  58  58   a
+36     20  12  4   58  58  58   c
 
 >> C3: Did any ambiguities in the scheduler specification make values
 >> in the table uncertain?  If so, what rule did you use to resolve
 >> them?  Does this match the behavior of your scheduler?
-
+when they all are the same priority i ran the rightmost thread
 >> C4: How is the way you divided the cost of scheduling between code
 >> inside and outside interrupt context likely to affect performance?
-
+it might have O(n) complexity because it recomputes priority linearly
 ---- RATIONALE ----
 
 >> C5: Briefly critique your design, pointing out advantages and
 >> disadvantages in your design choices.  If you were to have extra
 >> time to work on this part of the project, how might you choose to
 >> refine or improve your design?
-
+i would improve the priority scheduler to run at a faster time complexity
 >> C6: The assignment explains arithmetic for fixed-point math in
 >> detail, but it leaves it open to you to implement it.  Why did you
 >> decide to implement it the way you did?  If you created an
 >> abstraction layer for fixed-point math, that is, an abstract data
 >> type and/or a set of functions or macros to manipulate fixed-point
 >> numbers, why did you do so?  If not, why not?
-
+i decided to implement it the way i did with macros because i found
+it simpler to implement and i didn't want to create another layer just for
+fixed-point math
 			   SURVEY QUESTIONS
 			   ================
 
@@ -176,15 +181,16 @@ the quarter.
 
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
-
+it was fine
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
-
+working on the priority donations 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
-
+no
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
-
+no
 >> Any other comments?
+no
